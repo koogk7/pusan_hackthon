@@ -2,7 +2,7 @@
 # Created by https://www.gitignore.io/api/django
 # Edit at https://www.gitignore.io/?templates=django
 
-/pusan_hackathon/setting.py
+/pusan_hackathon/settings.py
 
 ### Django ###
 *.log
