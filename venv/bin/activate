@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Applications/전공정리/gitRepo/pusan_hackathon/venv"
+VIRTUAL_ENV="/Applications/전공정리/ventilation_decision/venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

@@ -1,4 +1,4 @@
-#!/Applications/전공정리/gitRepo/pusan_hackathon/venv/bin/python
+#!/Applications/전공정리/ventilation_decision/venv/bin/python
 from django.core import management
 
 if __name__ == "__main__":

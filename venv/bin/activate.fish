@@ -29,7 +29,7 @@ end
 # unset irrelevant variables
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/Applications/전공정리/gitRepo/pusan_hackathon/venv"
+set -gx VIRTUAL_ENV "/Applications/전공정리/ventilation_decision/venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH

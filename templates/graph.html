@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"></script>
+    <script
+      src="https://code.jquery.com/jquery-3.4.1.min.js"
+      integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+      crossorigin="anonymous"></script>
+    <title>Chart Demo</title>
+</head>
+<style>
+    .btn {
+        width: 100px;
+        height: 40px;
+        margin-left: 10px;
+        background: white;
+        color: tomato;
+        border-color: blue;
+        border-width: 2px;
+    }
+</style>
+
+
+<body>
+    <button id="cai-btn" class="btn" onclick="toggleClickHandler(event);">CAI 수치</button>
+    <button id="co-btn" class="btn" onclick="toggleClickHandler(event);">일산화 탄소</button>
+    <button id="o3-btn" class="btn" onclick="toggleClickHandler(event);">오존</button>
+    <button id="dust-btn" class="btn" onclick="toggleClickHandler(event);">미세먼지</button>
+    <canvas id="chart-board" style="max-height: 1500px; max-width: 1500px;"></canvas>
+    <button id="test-btn" class="btn" onclick="requestData();">Test</button>
+
+
+<script>
+    var insideData = {{ insideData }};
+    var outsideData = {{ outsideData }};
+    var timdData = {{ insideTime|safe }};
+    var chartName = "CAI Chart";
+    var board_id = "chart-board";
+    var test = 3;
+    var lowColor = "rgba(247,170,140,0.44)";
+    var middleColor = "rgba(247,216,169,0.47)";
+    var highColor = "rgba(167,247,149,0.51)";
+    var chart_board;
+
+    window.addEventListener("load", ()=> {
+        updateGraph(chartName, board_id, insideData, outsideData, timdData);
+    });
+
+    function toggleClickHandler(e){
+        console.log("toggle click");
+        var dataType = e.target.getAttribute("id").split("-")[0];
+        console.log(dataType);
+        chartName = dataType.toUpperCase() + " Chart";
+
+        $.ajax({
+            type: "POST",
+            url:'update',
+            data: { testData: test, dataType: dataType, csrfmiddlewaretoken: '{{ csrf_token }}'},
+            dataType : "json",
+            success: response => {
+                console.log("통신에 성공했습니다.");
+                console.log(response);
+                insideData = response.insideData;
+                outsideData = response.outsideData;
+                timdData = response.dataTime;
+                updateGraph(chartName, board_id);
+            },
+            error: function(xhr, status, error){
+                console.log("통신에 실패했습니다");
+                console.log(error);
+            }
+        });
+
+
+    };
+
+
+    function updateGraph(graphName, board_id){
+        var ctx = document.getElementById(board_id).getContext('2d');
+        chart_board = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: timdData,
+                datasets: [
+                    getChartData(insideData, "inside", "blue"),
+                    getChartData(outsideData, "outside", "red")
+                ]
+            },
+            options: {
+                    legend: {
+                        labels: {
+                            fontSize: 17
+                        }
+                    },
+                    responsive: true,
+                    title: {
+                        display: true,
+                        text: graphName,
+                        fontSize : 40,
+                        fontColor : "red"
+                    },
+                    backgroundRules: [{
+                        backgroundColor: lowColor,
+                        yAxisSegement: 20
+                    }, {
+                        backgroundColor: middleColor,
+                        yAxisSegement: 40
+                    }, {
+                        backgroundColor: highColor,
+                        yAxisSegement: 100
+                    }],
+                    scales: {
+                        yAxes: [{
+                            ticks: {
+                                beginAtZero: true,
+                                stepSize: 10
+                            }
+                        }]
+                    }
+                },
+            plugins: [{
+                beforeDraw: function(chart) {
+                    var rules = chart.chart.options.backgroundRules;
+                    var ctx = chart.chart.ctx;
+                    var yAxis = chart.chart.scales["y-axis-0"];
+                    var xaxis = chart.chart.scales["x-axis-0"];
+                    for (var i = 0; i < rules.length; ++i) {
+                        var yAxisSegement = (rules[i].yAxisSegement > yAxis.ticksAsNumbers[0] ? yAxis.ticksAsNumbers[0] : rules[i].yAxisSegement);
+                        var yAxisPosStart = yAxis.height - ((yAxisSegement * yAxis.height) / yAxis.ticksAsNumbers[0]) + chart.chart.controller.chartArea.top;
+                        var yAxisPosEnd = (i === 0 ? yAxis.height : yAxis.height - ((rules[i - 1].yAxisSegement * yAxis.height) / yAxis.ticksAsNumbers[0]));
+                        ctx.fillStyle = rules[i].backgroundColor;
+                        ctx.fillRect(xaxis.left, yAxisPosStart, xaxis.width, yAxisPosEnd - yAxisPosStart + chart.chart.controller.chartArea.top);
+                    }
+                }
+            }]
+        });
+
+    }
+
+    function requestData() {
+
+        var dataType = chartName.split(" ")[0];
+        console.log(dataType);
+
+        $.ajax({
+            type: "POST",
+            url: 'add/value',
+            data: {dataType: dataType, csrfmiddlewaretoken: '{{ csrf_token }}'},
+            dataType: "json",
+            success: response => {
+                console.log("통신에 성공했습니다.");
+                console.log(response);
+
+                addData(insideData, response.inside);
+                addData(outsideData, response.outside);
+                addData(timdData, response.dataTime);
+
+                chart_board.update();
+            },
+            error: function (xhr, status, error) {
+                console.log("통신에 실패했습니다");
+                console.log(error);
+            }
+        });
+
+    }
+
+    function addData(dataList, value) {
+        dataList.push(value);
+        dataList.shift();
+    }
+
+    function getChartData(dataList, label, color) {
+        return {
+            label: label,
+            fill: false,
+            data: dataList,
+            borderWidth: 2,
+            borderColor: color
+        }
+
+    }
+
+
+</script>
+
+</body>
+</html>
