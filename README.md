@@ -10,11 +10,11 @@
 
 ### How To Build
 
-1. Django 설치
+1. Django 설치  
    `pip install Django`
-2. 가상환경 켜기
+2. 가상환경 켜기  
    `source venv/bin/activate`
-3. 실행
-    `python manage.py runserver'
+3. 실행  
+    `python manage.py runserver`
 
  
