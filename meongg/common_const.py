@@ -1,4 +1,5 @@
 INSIDE = "INSIDE"
 OUTSIDE = "OUTSIDE"
+API = "API"
 DATA_VALUE = "data_value"
 DATA_TIME = "data_time"

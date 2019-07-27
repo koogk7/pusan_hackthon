@@ -15,9 +15,19 @@
         height: 40px;
         margin-left: 10px;
         background: white;
-        color: tomato;
+        color: red;
         border-color: blue;
         border-width: 2px;
+    }
+
+    .msg-box {
+        text-align: center;
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    .noti-box {
+        float: right;
     }
 </style>
 
@@ -27,25 +37,37 @@
     <button id="co-btn" class="btn" onclick="toggleClickHandler(event);">일산화 탄소</button>
     <button id="o3-btn" class="btn" onclick="toggleClickHandler(event);">오존</button>
     <button id="dust-btn" class="btn" onclick="toggleClickHandler(event);">미세먼지</button>
+    <span class="noti-box"><strong>1002명이 환기중입니다.</strong></span>
     <canvas id="chart-board" style="max-height: 1500px; max-width: 1500px;"></canvas>
-    <button id="test-btn" class="btn" onclick="requestData();">Test</button>
-
+{#    <button id="test-btn" class="btn" onclick="toggleTest();">Test Toggle</button>#}
+    <div class="msg-box"></div>
 
 <script>
     var insideData = {{ insideData }};
     var outsideData = {{ outsideData }};
     var timdData = {{ insideTime|safe }};
-    var chartName = "CAI Chart";
-    var board_id = "chart-board";
-    var test = 3;
-    var lowColor = "rgba(247,170,140,0.44)";
-    var middleColor = "rgba(247,216,169,0.47)";
-    var highColor = "rgba(167,247,149,0.51)";
-    var chart_board;
+    var apiData = {{ apiData }};
+    var chartName = "CAI 지수";
+    var chart_board = null;
+    var test_toggle = true;
+    var test_time_id;
+    var offset = 6;
+    const board_id = "chart-board";
+    const lowColor = "rgba(167,247,149,0.51)";
+    const middleColor = "rgba(247,216,169,0.47)";
+    const highColor = "rgba(247,170,140,0.44)";
+    const lowLimit = 50;
+    const middleLimit = 100;
+    const highLimit = 250;
 
     window.addEventListener("load", ()=> {
         updateGraph(chartName, board_id, insideData, outsideData, timdData);
+        test_time_id = setInterval(requestData, 5000, 5);
     });
+
+    function toggleTest(){
+        clearInterval(test_time_id);
+    }
 
     function toggleClickHandler(e){
         console.log("toggle click");
@@ -56,11 +78,12 @@
         $.ajax({
             type: "POST",
             url:'update',
-            data: { testData: test, dataType: dataType, csrfmiddlewaretoken: '{{ csrf_token }}'},
+            data: { dataType: dataType, csrfmiddlewaretoken: '{{ csrf_token }}'},
             dataType : "json",
             success: response => {
                 console.log("통신에 성공했습니다.");
-                console.log(response);
+                console.log(response.insideData);
+                console.log(response.outsideData);
                 insideData = response.insideData;
                 outsideData = response.outsideData;
                 timdData = response.dataTime;
@@ -77,14 +100,20 @@
 
 
     function updateGraph(graphName, board_id){
+
+        if(chart_board!=null){
+           chart_board.destroy();
+        }
+
         var ctx = document.getElementById(board_id).getContext('2d');
         chart_board = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: timdData,
                 datasets: [
-                    getChartData(insideData, "inside", "blue"),
-                    getChartData(outsideData, "outside", "red")
+                    getChartData(insideData, "실내 대기", "blue"),
+                    getChartData(outsideData, "실외 대기", "red"),
+                    getChartData(apiData, "광안리 대기", "gray"),
                 ]
             },
             options: {
@@ -102,19 +131,20 @@
                     },
                     backgroundRules: [{
                         backgroundColor: lowColor,
-                        yAxisSegement: 20
+                        yAxisSegement: lowLimit
                     }, {
                         backgroundColor: middleColor,
-                        yAxisSegement: 40
+                        yAxisSegement: middleLimit
                     }, {
                         backgroundColor: highColor,
-                        yAxisSegement: 100
+                        yAxisSegement: highLimit
                     }],
                     scales: {
                         yAxes: [{
                             ticks: {
                                 beginAtZero: true,
-                                stepSize: 10
+                                stepSize: 25,
+                                suggestedMax: highLimit - 100
                             }
                         }]
                     }
@@ -136,17 +166,17 @@
             }]
         });
 
+        setStateMsg(insideData[insideData.length-1], outsideData[outsideData.length-1]);
     }
 
     function requestData() {
-
         var dataType = chartName.split(" ")[0];
         console.log(dataType);
 
         $.ajax({
             type: "POST",
             url: 'add/value',
-            data: {dataType: dataType, csrfmiddlewaretoken: '{{ csrf_token }}'},
+            data: {dataType: dataType, offset: offset, csrfmiddlewaretoken: '{{ csrf_token }}'},
             dataType: "json",
             success: response => {
                 console.log("통신에 성공했습니다.");
@@ -155,8 +185,11 @@
                 addData(insideData, response.inside);
                 addData(outsideData, response.outside);
                 addData(timdData, response.dataTime);
+                addData(apiData, response.api);
 
                 chart_board.update();
+                offset += 1;
+                setStateMsg(response.inside, response.outside);
             },
             error: function (xhr, status, error) {
                 console.log("통신에 실패했습니다");
@@ -166,18 +199,60 @@
 
     }
 
+    function setStateMsg(inside, outside) {
+        var msg_box = document.querySelector(".msg-box");
+        var isBatterOutside = inside > outside;
+        var msg;
+
+        console.log(inside);
+        console.log(outside);
+
+        if(isBatterOutside){// 밖의 공기가 더 좋음
+            if(outside > middleLimit) {
+                msg = "실내 외부에서의 정화가 필요합니다.";
+                msg_box.style.color = "red";
+            } else if( inside - outside < 20){
+                msg = "환기하기 적절한 환경입니다.";
+                msg_box.style.color = "green";
+            }
+            else {
+                msg = "환기가 필요한 환경입니다!";
+                msg_box.style.color = "blue";
+            }
+        } else {
+            if(outside < middleLimit) {
+                msg = "환기하기 적절한 환경입니다.";
+                msg_box.style.color = "green";
+            }
+            else {
+                msg = "실내 외부에서의 정화가 필요합니다.";
+                msg_box.style.color = "blue";
+            }
+        }
+
+        msg_box.textContent = msg;
+        console.log(msg);
+
+    }
+
     function addData(dataList, value) {
         dataList.push(value);
         dataList.shift();
     }
 
     function getChartData(dataList, label, color) {
+        var pointRadius = [];
+        dataList.map(item => pointRadius.push(0));
+        pointRadius[pointRadius.length-1] = 5;
+
         return {
             label: label,
             fill: false,
             data: dataList,
             borderWidth: 2,
-            borderColor: color
+            borderColor: color,
+            {#pointRadius: pointRadius,#}
+            pointBackgroundColor : color
         }
 
     }
